@@ -80,6 +80,11 @@ const path constants::package_drawings()
     return package_xl().append("drawings");
 }
 
+const path constants::package_media()
+{
+    return package_xl().append("media");
+}
+
 const path constants::part_content_types()
 {
     return path("[Content_Types].xml");

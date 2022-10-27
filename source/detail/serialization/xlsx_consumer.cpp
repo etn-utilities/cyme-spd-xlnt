@@ -25,11 +25,14 @@
 #include <cctype>
 #include <numeric> // for std::accumulate
 #include <sstream>
+#include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 #include <xlnt/cell/cell.hpp>
 #include <xlnt/cell/comment.hpp>
 #include <xlnt/cell/hyperlink.hpp>
+#include <xlnt/drawing/image.hpp>
 #include <xlnt/drawing/spreadsheet_drawing.hpp>
 #include <xlnt/packaging/manifest.hpp>
 #include <xlnt/utils/optional.hpp>
@@ -192,10 +195,10 @@ xlnt::detail::Cell parse_cell(xlnt::row_t row_arg, xml::parser *parser)
         }
     }
     int level = 1; // nesting level
-        // 1 == <c>
-        // 2 == <v>/<f>
-        // 3 == <is><t>
-        // exit loop at </c>
+                   // 1 == <c>
+                   // 2 == <v>/<f>
+                   // 3 == <is><t>
+                   // exit loop at </c>
     while (level > 0)
     {
         xml::parser::event_type e = parser->next();
@@ -330,8 +333,8 @@ Sheet_Data parse_sheet_data(xml::parser *parser, xlnt::detail::number_serialiser
 {
     Sheet_Data sheet_data;
     int level = 1; // nesting level
-        // 1 == <sheetData>
-        // 2 == <row>
+                   // 1 == <sheetData>
+                   // 2 == <row>
 
     while (level > 0)
     {
@@ -1076,7 +1079,8 @@ worksheet xlsx_consumer::read_worksheet_end(const std::string &rel_id)
             for (std::size_t i = 0; i < 3; ++i)
             {
                 auto loc = i == 0 ? header_footer::location::left
-                                  : i == 1 ? header_footer::location::center : header_footer::location::right;
+                    : i == 1      ? header_footer::location::center
+                                  : header_footer::location::right;
 
                 if (different_odd_even)
                 {
@@ -1272,7 +1276,7 @@ bool xlsx_consumer::has_cell()
     auto ws = worksheet(current_worksheet_);
 
     while (streaming_cell_ // we're not at the end of the file
-           && !in_element(qn("spreadsheetml", "row"))) // we're at the end of a row, or between rows
+        && !in_element(qn("spreadsheetml", "row"))) // we're at the end of a row, or between rows
     {
         if (parser().peek() == xml::parser::event_type::end_element
             && stack_.back() == qn("spreadsheetml", "row"))
@@ -1700,8 +1704,8 @@ void xlsx_consumer::read_content_types()
 
 void xlsx_consumer::read_core_properties()
 {
-    //qn("extended-properties", "Properties");
-    //qn("custom-properties", "Properties");
+    // qn("extended-properties", "Properties");
+    // qn("custom-properties", "Properties");
     expect_start_element(qn("core-properties", "coreProperties"), xml::content::complex);
 
     while (in_element(qn("core-properties", "coreProperties")))
@@ -2893,23 +2897,199 @@ void xlsx_consumer::read_comments(worksheet ws)
 void xlsx_consumer::read_drawings(worksheet ws, const path &part)
 {
     auto images = manifest().relationships(part, relationship_type::image);
+    std::unordered_set<xlnt::path> image_paths;
 
-    auto sd = drawing::spreadsheet_drawing(parser());
+    expect_start_element(qn("xdr", "wsDr"), xml::content::complex);
 
-    for (const auto &image_rel_id : sd.get_embed_ids())
+    while (in_element(qn("xdr", "wsDr")))
     {
-        auto image_rel = std::find_if(images.begin(), images.end(),
-            [&](const relationship &r) { return r.id() == image_rel_id; });
+        expect_start_element(qn("xdr", "twoCellAnchor"), xml::content::complex);
 
-        if (image_rel != images.end())
+        drawing::drawing drawing;
+
+        // Position Data
+
         {
-            const auto url = image_rel->target().path().resolve(part.parent());
+            expect_start_element(qn("xdr", "from"), xml::content::complex);
 
-            read_image(url);
+            drawing::position from;
+
+            {
+                expect_start_element(qn("xdr", "col"), xml::content::simple);
+                from.col = read_integer();
+                expect_end_element(qn("xdr", "col"));
+            }
+
+            {
+                expect_start_element(qn("xdr", "colOff"), xml::content::simple);
+                from.colOff = read_integer();
+                expect_end_element(qn("xdr", "colOff"));
+            }
+
+            {
+                expect_start_element(qn("xdr", "row"), xml::content::simple);
+                from.row = read_integer();
+                expect_end_element(qn("xdr", "row"));
+            }
+
+            {
+                expect_start_element(qn("xdr", "rowOff"), xml::content::simple);
+                from.rowOff = read_integer();
+                expect_end_element(qn("xdr", "rowOff"));
+            }
+
+            drawing.from(std::move(from));
+
+            expect_end_element(qn("xdr", "from"));
         }
+
+        {
+            expect_start_element(qn("xdr", "to"), xml::content::complex);
+
+            drawing::position to;
+
+            {
+                expect_start_element(qn("xdr", "col"), xml::content::simple);
+                to.col = read_integer();
+                expect_end_element(qn("xdr", "col"));
+            }
+
+            {
+                expect_start_element(qn("xdr", "colOff"), xml::content::simple);
+                to.colOff = read_integer();
+                expect_end_element(qn("xdr", "colOff"));
+            }
+
+            {
+                expect_start_element(qn("xdr", "row"), xml::content::simple);
+                to.row = read_integer();
+                expect_end_element(qn("xdr", "row"));
+            }
+            {
+                expect_start_element(qn("xdr", "rowOff"), xml::content::simple);
+                to.rowOff = read_integer();
+                expect_end_element(qn("xdr", "rowOff"));
+            }
+
+            drawing.to(std::move(to));
+
+            expect_end_element(qn("xdr", "to"));
+        }
+
+        { // Picture
+
+            expect_start_element(qn("xdr", "pic"), xml::content::complex);
+
+            { // non-visual Picture Properties
+
+                expect_start_element(qn("xdr", "nvPicPr"), xml::content::complex);
+
+                { // canvas Non-visual Properties
+
+                    expect_start_element(qn("xdr", "cNvPr"), xml::content::complex);
+
+                    drawing.id(parser().attribute("id"));
+                    drawing.name(parser().attribute("name"));
+
+                    skip_remaining_content(qn("xdr", "cNvPr"));
+                    expect_end_element(qn("xdr", "cNvPr"));
+                }
+
+                { // canvas Non-visual Picture Properties
+
+                    expect_start_element(qn("xdr", "cNvPicPr"), xml::content::complex);
+                    skip_remaining_content(qn("xdr", "cNvPicPr"));
+                    expect_end_element(qn("xdr", "cNvPicPr"));
+                }
+
+                skip_remaining_content(qn("xdr", "nvPicPr"));
+                expect_end_element(qn("xdr", "nvPicPr"));
+            }
+
+            {
+                expect_start_element(qn("xdr", "blipFill"), xml::content::complex);
+
+                {
+                    expect_start_element(qn("a", "blip"), xml::content::complex);
+
+                    const auto embed_id = parser().attribute(xml::qname(qn("r", "embed")));
+
+                    auto image_rel = std::find_if(images.begin(), images.end(),
+                        [&](const relationship &r) { return r.id() == embed_id; });
+
+                    if (image_rel != images.end())
+                    {
+                        drawing.relationship(*image_rel);
+
+                        const auto url = image_rel->target().path().resolve(part.parent());
+                        image_paths.insert(url);
+                    }
+
+                    skip_remaining_content(qn("a", "blip"));
+                    expect_end_element(qn("a", "blip"));
+                }
+
+                // a:stretch ???
+
+                skip_remaining_content(qn("xdr", "blipFill"));
+                expect_end_element(qn("xdr", "blipFill"));
+            }
+
+            { // Shape Properties
+
+                expect_start_element(qn("xdr", "spPr"), xml::content::complex);
+
+                {
+                    expect_start_element(qn("a", "xfrm"), xml::content::complex);
+
+                    /* 
+                    expect_start_element(qn("a", "off"), xml::content::empty);
+
+                    // ?? x and y
+                    skip_attributes();
+                    expect_end_element(qn("a", "off"));
+
+                    expect_start_element(qn("a", "ext"), xml::content::empty);
+
+                    // ?? cx and cy
+                    skip_attributes();
+                    expect_end_element(qn("a", "ext"));
+                    */
+
+                    skip_remaining_content(qn("a", "xfrm"));
+                    expect_end_element(qn("a", "xfrm"));
+                }
+
+                {
+                    expect_start_element(qn("a", "prstGeom"), xml::content::complex);
+
+                    // a:avLst empty
+
+                    skip_remaining_content(qn("a", "prstGeom"));
+                    expect_end_element(qn("a", "prstGeom"));
+                }
+
+                skip_remaining_content(qn("xdr", "spPr"));
+                expect_end_element(qn("xdr", "spPr"));
+            }
+
+            skip_remaining_content(qn("xdr", "pic"));
+            expect_end_element(qn("xdr", "pic"));
+        }
+
+        skip_remaining_content(qn("xdr", "twoCellAnchor"));
+        expect_end_element(qn("xdr", "twoCellAnchor"));
+
+        auto res = ws.d_->drawings_.emplace(drawing.name(), drawing);
+        assert(res.second);
     }
 
-    ws.d_->drawing_ = sd;
+    expect_end_element(qn("xdr", "wsDr"));
+
+    for (const auto &path : image_paths)
+    {
+        read_image(path);
+    }
 }
 
 // Unknown Parts
@@ -2949,6 +3129,24 @@ std::string xlsx_consumer::read_text()
     }
 
     return text;
+}
+
+int xlsx_consumer::read_integer()
+{
+    const auto text = read_text();
+
+    try
+    {
+        return std::stoi(text);
+    }
+    catch (const std::invalid_argument &)
+    {
+        throw xlnt::exception("XML parsing error: expected integer value.");
+    }
+    catch (const std::out_of_range &)
+    {
+        throw xlnt::exception("XML parsing error: Integer overflow.");
+    }
 }
 
 variant xlsx_consumer::read_variant()

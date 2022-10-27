@@ -32,6 +32,7 @@
 
 #include <xlnt/xlnt_config.hpp>
 #include <xlnt/cell/index_types.hpp>
+#include <xlnt/drawing/image.hpp>
 #include <xlnt/packaging/relationship.hpp>
 #include <xlnt/worksheet/page_margins.hpp>
 #include <xlnt/worksheet/page_setup.hpp>
@@ -254,11 +255,11 @@ public:
     /// </summary>
     const class range columns(bool skip_null = true) const;
 
-    //TODO: finish implementing cell_iterator wrapping before uncommenting
-    //class cell_vector cells(bool skip_null = true);
+    // TODO: finish implementing cell_iterator wrapping before uncommenting
+    // class cell_vector cells(bool skip_null = true);
 
-    //TODO: finish implementing cell_iterator wrapping before uncommenting
-    //const class cell_vector cells(bool skip_null = true) const;
+    // TODO: finish implementing cell_iterator wrapping before uncommenting
+    // const class cell_vector cells(bool skip_null = true) const;
 
     /// <summary>
     /// Clears memory used by the given cell.
@@ -437,7 +438,7 @@ public:
     /// If skip_null is true (default), empty cells (For example if the first row or column is empty)
     /// will not be included in upper left bound of range.
     /// </summary>
-    range_reference calculate_dimension(bool skip_null=true) const;
+    range_reference calculate_dimension(bool skip_null = true) const;
 
     // cell merge
 
@@ -771,6 +772,13 @@ public:
     /// Returns true if this worksheet has a page setup.
     /// </summary>
     bool has_drawing() const;
+    const std::unordered_map<std::string, drawing::drawing> drawings() const;
+
+    void add_drawing(const drawing::drawing &);
+    void add_drawing(const std::string &name, const xlnt::path &image, cell_reference , int x_pixels, int y_pixels, drawing::alignment = drawing::alignment::left);
+    void add_drawing(const std::string &name, const xlnt::path &image, range_reference, int x_pixels, int y_pixels, drawing::alignment = drawing::alignment::left);
+
+    void remove_drawing(const std::string &name);
 
     /// <summary>
     /// Returns true if this worksheet is empty.
@@ -795,6 +803,11 @@ private:
     /// Creates a comments part in the manifest as a relationship target of this sheet.
     /// </summary>
     void register_comments_in_manifest();
+
+    /// <summary>
+    /// Creates a drawings part in the manifest as a relationship target of this sheet.
+    /// </summary>
+    void register_drawing_in_manifest();
 
     /// <summary>
     /// Creates a calcChain part in the manifest if it doesn't already exist.

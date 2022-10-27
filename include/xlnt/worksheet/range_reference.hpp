@@ -110,6 +110,9 @@ public:
     /// </summary>
     range_reference make_offset(int column_offset, int row_offset) const;
 
+
+    bool contains(cell_reference) const;
+
     /// <summary>
     /// Returns a string representation of this range.
     /// </summary>

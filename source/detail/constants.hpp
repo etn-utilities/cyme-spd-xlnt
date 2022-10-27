@@ -79,10 +79,15 @@ struct XLNT_API constants
     /// </summary>
     static const path package_worksheets();
 
-	/// <summary>
-	/// Returns the URI of the directory containing package worksheets.
-	/// </summary>
-	static const path package_drawings();
+    /// <summary>
+    /// Returns the URI of the directory containing package worksheets.
+    /// </summary>
+    static const path package_drawings();
+
+    /// <summary>
+    /// Returns the URI of the directory containing medias like images.
+    /// </summary>
+    static const path package_media();
 
     /// <summary>
     /// Returns the URI of the content types package part.

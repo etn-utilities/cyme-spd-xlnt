@@ -26,6 +26,7 @@
 #include <array>
 #include <fstream>
 #include <functional>
+#include <iterator>
 #include <set>
 
 #include <xlnt/cell/cell.hpp>
@@ -249,7 +250,7 @@ std::string content_type(xlnt::relationship_type type)
     case relationship_type::volatile_dependencies:
         return "application/vnd.openxmlformats-officedocument.spreadsheetml.volatileDependencies+xml";
     case relationship_type::vbaproject:
-        return "application/vnd.ms-office.vbaProject";        
+        return "application/vnd.ms-office.vbaProject";
     case relationship_type::worksheet:
         return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml";
     }
@@ -641,6 +642,35 @@ void workbook::register_worksheet_part(worksheet ws, relationship_type type)
             manifest().register_relationship(
                 uri(ws_path.string()), relationship_type::comments, uri(relative_path.string()), target_mode::internal);
         }
+
+        return;
+    }
+
+    if (type == relationship_type::drawings)
+    {
+        if (!manifest().has_relationship(ws_path, relationship_type::drawings))
+        {
+            std::size_t file_number = 1;
+            path filename("drawings/drawing1.xml");
+
+            while (true)
+            {
+                if (!manifest().has_override_type(constants::package_xl().append(filename))) break;
+
+                file_number++;
+                filename = path("drawings/drawing" + std::to_string(file_number) + ".xml");
+            }
+
+            const path absolute_path(constants::package_xl().append(filename));
+            manifest().register_override_type(
+                absolute_path, "application/vnd.openxmlformats-officedocument.drawing+xml");
+
+            const path relative_path(path("..").append(filename));
+            manifest().register_relationship(
+                uri(ws_path.string()), relationship_type::drawings, uri(relative_path.string()), target_mode::internal);
+        }
+
+        return;
     }
 }
 
@@ -1446,6 +1476,45 @@ const std::vector<std::uint8_t> &workbook::thumbnail() const
 const std::unordered_map<std::string, std::vector<std::uint8_t>> &workbook::binaries() const
 {
     return d_->binaries_;
+}
+
+void workbook::add_image(const xlnt::path &filename, const xlnt::path &archive_file)
+{
+    if (!(filename.exists() && filename.is_file()))
+    {
+        throw xlnt::exception("File not found " + filename.string());
+    }
+
+    std::ifstream file_stream;
+    open_stream(file_stream, filename.string());
+
+    if (!file_stream.good())
+    {
+        throw xlnt::exception("Could not open file " + filename.string());
+    }
+
+    const auto ext = filename.extension();
+    if (!ext.empty())
+    {
+        manifest().register_default_type(ext, "image/" + ext);
+    }
+
+    std::vector<std::uint8_t> data(std::istreambuf_iterator<char>{file_stream}, {});
+
+    add_image(std::move(data), archive_file);
+}
+
+void workbook::add_image(std::vector<std::uint8_t> image_data, const xlnt::path &archive_file)
+{
+    const auto target = constants::package_media().append(archive_file).relative_to(path{"/"});
+
+    d_->images_[target.string()] = std::move(image_data);
+}
+
+bool workbook::has_image(const xlnt::path &name) const
+{
+    const auto key = constants::package_media().append(name).relative_to(path{"/"}).string();
+    return d_->images_.find(key) != d_->images_.end();
 }
 
 style workbook::create_style(const std::string &name)

@@ -629,8 +629,8 @@ void xlsx_producer::write_workbook(const relationship &rel)
     {
         write_start_element(xmlns, "calcPr");
         write_attribute("calcId", source_.calculation_properties().calc_id);
-        //write_attribute("calcMode", "auto");
-        //write_attribute("fullCalcOnLoad", "1");
+        // write_attribute("calcMode", "auto");
+        // write_attribute("fullCalcOnLoad", "1");
         write_attribute("concurrentCalc", write_bool(source_.calculation_properties().concurrent_calc));
         write_end_element(xmlns, "calcPr");
     }
@@ -675,7 +675,7 @@ void xlsx_producer::write_workbook(const relationship &rel)
         if (child_rel.type() == relationship_type::calculation_chain) continue;
 
         path archive_path(child_rel.source().path().parent().append(child_rel.target().path()));
-        
+
         // write binary
         switch (child_rel.type())
         {
@@ -2524,9 +2524,12 @@ void xlsx_producer::write_worksheet(const relationship &rel)
         write_start_element(xmlns, "row");
         write_attribute("r", row);
 
-        auto span_string = std::to_string(first_block_column.index) + ":"
-            + std::to_string(last_block_column.index);
-        write_attribute("spans", span_string);
+        if (first_block_column.index < last_block_column.index)
+        {
+            auto span_string = std::to_string(first_block_column.index) + ":"
+                + std::to_string(last_block_column.index);
+            write_attribute("spans", span_string);
+        }
 
         if (ws.has_row_properties(row))
         {
@@ -2623,7 +2626,7 @@ void xlsx_producer::write_worksheet(const relationship &rel)
                     break;
 
                 case cell::type::number: // default, don't write it
-                    //write_attribute("t", "n");
+                    // write_attribute("t", "n");
                     break;
 
                 case cell::type::shared_string:
@@ -2635,9 +2638,9 @@ void xlsx_producer::write_worksheet(const relationship &rel)
                     break;
                 }
 
-                //write_attribute("cm", "");
-                //write_attribute("vm", "");
-                //write_attribute("ph", "");
+                // write_attribute("cm", "");
+                // write_attribute("vm", "");
+                // write_attribute("ph", "");
 
                 // begin child elements
 
@@ -2749,7 +2752,7 @@ void xlsx_producer::write_worksheet(const relationship &rel)
                 write_attribute("dxfId", rule->differential_format_id);
                 write_attribute("priority", i++);
                 write_attribute("text", rule->when.text_comparand_);
-                //TODO: what does this formula mean and why is it necessary?
+                // TODO: what does this formula mean and why is it necessary?
                 write_element(xmlns, "formula", "NOT(ISERROR(SEARCH(\"" + rule->when.text_comparand_ + "\",A1)))");
                 write_end_element(xmlns, "cfRule");
             }
@@ -2855,7 +2858,7 @@ void xlsx_producer::write_worksheet(const relationship &rel)
         {
             write_attribute("verticalDpi", ws.page_setup().vertical_dpi_.get());
         }
-        
+
         if (ps.has_paper_size())
         {
             write_attribute("paperSize", static_cast<std::size_t>(ps.paper_size()));
@@ -3287,15 +3290,131 @@ void xlsx_producer::write_vml_drawings(const relationship &rel, worksheet ws, co
 
 void xlsx_producer::write_drawings(const relationship &drawing_rel, worksheet ws)
 {
+    static const auto &xmlns_xdr = constants::ns("xdr");
+    static const auto &xmlns_a = constants::ns("a");
+    static const auto &xmlns_r = constants::ns("r");
+
     const auto workbook_rel = source_.manifest().relationship(path("/"), relationship_type::office_document);
     const auto worksheet_rel = ws.referring_relationship();
     const auto drawing_part = source_.manifest().canonicalize({workbook_rel, worksheet_rel, drawing_rel});
     const auto drawing_rels = source_.manifest().relationships(drawing_part);
 
-    if (ws.d_->drawing_.is_set())
+    write_start_element(xmlns_xdr, "wsDr");
+    write_namespace(xmlns_xdr, "xdr");
+    write_namespace(xmlns_a, "a");
+
+    for (const auto &drawing_pair : ws.d_->drawings_)
     {
-        ws.d_->drawing_.get().serialize(*current_part_serializer_);
+        const auto &drawing = drawing_pair.second;
+
+        write_start_element(xmlns_xdr, "twoCellAnchor");
+        write_attribute("editAs", "oneCell");
+
+        {
+            write_start_element(xmlns_xdr, "from");
+
+            write_element(xmlns_xdr, "col", std::to_string(drawing.from().col));
+            write_element(xmlns_xdr, "colOff", std::to_string(drawing.from().colOff));
+            write_element(xmlns_xdr, "row", std::to_string(drawing.from().row));
+            write_element(xmlns_xdr, "rowOff", std::to_string(drawing.from().rowOff));
+
+            write_end_element(xmlns_xdr, "from");
+        }
+
+        {
+            write_start_element(xmlns_xdr, "to");
+
+            write_element(xmlns_xdr, "col", std::to_string(drawing.to().col));
+            write_element(xmlns_xdr, "colOff", std::to_string(drawing.to().colOff));
+            write_element(xmlns_xdr, "row", std::to_string(drawing.to().row));
+            write_element(xmlns_xdr, "rowOff", std::to_string(drawing.to().rowOff));
+
+            write_end_element(xmlns_xdr, "to");
+        }
+
+        {
+            write_start_element(xmlns_xdr, "pic");
+
+            {
+                write_start_element(xmlns_xdr, "nvPicPr");
+
+                {
+                    write_start_element(xmlns_xdr, "cNvPr");
+
+                    write_attribute("id", drawing.id());
+                    write_attribute("name", drawing.name());
+
+                    write_end_element(xmlns_xdr, "cNvPr");
+                }
+
+                {
+                    write_start_element(xmlns_xdr, "cNvPicPr");
+                    write_end_element(xmlns_xdr, "cNvPicPr");
+                }
+
+                write_end_element(xmlns_xdr, "nvPicPr");
+            }
+
+            {
+                write_start_element(xmlns_xdr, "blipFill");
+                {
+                    write_start_element(xmlns_a, "blip");
+                    write_namespace(xmlns_r, "r");
+
+                    write_attribute(xml::qname(xmlns_r, "embed"), drawing.relationship().id());
+                    // cstate??
+
+                    write_end_element(xmlns_a, "blip");
+                }
+
+                {
+                    write_start_element(xmlns_a, "stretch");
+
+                    write_start_element(xmlns_a, "fillRect");
+                    write_end_element(xmlns_a, "fillRect");
+
+                    write_end_element(xmlns_a, "stretch");
+                }
+
+                write_end_element(xmlns_xdr, "blipFill");
+            }
+
+            {
+                write_start_element(xmlns_xdr, "spPr");
+
+                {
+                    write_start_element(xmlns_a, "xfrm");
+
+                    write_start_element(xmlns_a, "off");
+                    write_attribute("x", "0");
+                    write_attribute("y", "0");
+                    write_end_element(xmlns_a, "off");
+
+                    write_start_element(xmlns_a, "ext");
+                    write_attribute("cx", std::to_string(drawing.to().colOff));
+                    write_attribute("cy", std::to_string(drawing.to().rowOff));
+                    write_end_element(xmlns_a, "ext");
+
+                    write_end_element(xmlns_a, "xfrm");
+                }
+
+                write_start_element(xmlns_a, "prstGeom");
+                write_attribute("prst", "rect");
+                write_end_element(xmlns_a, "prstGeom");
+
+                write_end_element(xmlns_xdr, "spPr");
+            }
+
+            write_end_element(xmlns_xdr, "pic");
+        }
+
+        write_start_element(xmlns_xdr, "clientData");
+        write_end_element(xmlns_xdr, "clientData");
+
+        write_end_element(xmlns_xdr, "twoCellAnchor");
     }
+
+    write_end_element(xmlns_xdr, "wsDr");
 
     if (!drawing_rels.empty())
     {
@@ -3306,11 +3425,13 @@ void xlsx_producer::write_drawings(const relationship &drawing_rel, worksheet ws
             if (rel.type() == relationship_type::image)
             {
                 const auto image_path = source_.manifest().canonicalize({workbook_rel, worksheet_rel, rel});
-                if (image_path.string().find("cid:") != std::string::npos)
+                if (image_path.string().find("cid:") != std::string::npos || saved_images_.count(image_path.string()) > 0)
                 {
-                    // skip cid attachments
+                    // skip cid attachments and already saved images (happens if multiple sheets reference a same image
                     continue;
                 }
+
+                saved_images_.insert(image_path.string());
                 write_image(image_path);
             }
         }

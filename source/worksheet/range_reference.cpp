@@ -95,6 +95,14 @@ range_reference range_reference::make_offset(int column_offset, int row_offset) 
     return top_left, bottom_right; // lol
 }
 
+bool range_reference::contains(cell_reference cell) const
+{
+    return top_left_.column_index() <= cell.column_index()
+        && top_left_.row() <= cell.row()
+        && bottom_right_.column_index() >= cell.column_index()
+        && bottom_right_.row() >= cell.row();
+}
+
 std::size_t range_reference::height() const
 {
     return 1 + bottom_right_.row() - top_left_.row();

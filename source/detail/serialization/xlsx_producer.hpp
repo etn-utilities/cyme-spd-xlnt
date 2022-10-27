@@ -28,6 +28,7 @@
 #include <memory>
 #include <type_traits>
 #include <vector>
+#include <unordered_set>
 
 #include <xlnt/utils/numeric.hpp>
 #include <detail/constants.hpp>
@@ -241,6 +242,8 @@ private:
 
     detail::worksheet_impl *current_worksheet_;
     detail::number_serialiser converter_;
+
+    std::unordered_set<std::string> saved_images_;
 };
 
 } // namespace detail

@@ -30,10 +30,12 @@
 #include <xlnt/cell/cell_reference.hpp>
 #include <xlnt/cell/index_types.hpp>
 #include <xlnt/packaging/relationship.hpp>
+#include <xlnt/packaging/uri.hpp>
 #include <xlnt/utils/date.hpp>
 #include <xlnt/utils/datetime.hpp>
 #include <xlnt/utils/exceptions.hpp>
 #include <xlnt/utils/numeric.hpp>
+#include <xlnt/utils/path.hpp>
 #include <xlnt/workbook/named_range.hpp>
 #include <xlnt/workbook/workbook.hpp>
 #include <xlnt/workbook/worksheet_iterator.hpp>
@@ -57,6 +59,19 @@ namespace {
 int points_to_pixels(double points, double dpi)
 {
     return static_cast<int>(std::ceil(points * dpi / 72));
+}
+
+template <typename T>
+constexpr int pixels_to_emus(T pixels)
+{
+    return static_cast<int>(9525 * pixels);
+}
+
+constexpr int excel_width_to_pixels(double width)
+{
+    constexpr int max_digit_width = 7;
+
+    return static_cast<int>(((256 * width + static_cast<int>(128 / max_digit_width)) / 256) * max_digit_width);
 }
 
 } // namespace
@@ -229,6 +244,152 @@ std::size_t worksheet::id() const
 std::string worksheet::title() const
 {
     return d_->title_;
+}
+
+void worksheet::add_drawing(const std::string &name, const xlnt::path &image_archive, cell_reference cellref, int x_pixels, int y_pixels, drawing::alignment align)
+{
+    add_drawing(name, image_archive, range_reference(cellref, cellref), x_pixels, y_pixels, align);
+}
+
+void worksheet::add_drawing(const std::string &name, const xlnt::path &image_archive, range_reference cells, int x_pixels, int y_pixels, drawing::alignment alignment)
+{
+    // If the worksheet's drawing relationship isn't present, add it.
+    register_drawing_in_manifest();
+
+    if (!workbook().has_image(image_archive))
+    {
+        throw xlnt::exception("Cannot add a drawing with an invalid image, add the image first.");
+    }
+
+    const auto image_path = constants::package_media().append(image_archive);
+    const auto &drawings_list = drawings();
+
+    if (drawings_list.find(name) != drawings_list.end())
+    {
+        throw xlnt::exception("Drawing name is already taken.");
+    }
+
+    auto &wb = workbook();
+    auto &manifest = wb.manifest();
+
+    auto wb_rel = manifest.relationship(xlnt::path("/"), relationship_type::office_document);
+    auto ws_rel = referring_relationship();
+    auto drawing_rel = manifest.relationship(path(), relationship_type::drawings);
+
+    auto drawing_part = manifest.canonicalize({wb_rel, ws_rel, drawing_rel});
+    auto relationships = manifest.relationships(drawing_part, relationship_type::image);
+
+    auto relation = std::find_if(relationships.cbegin(), relationships.cend(),
+        [&image_path, &drawing_part](xlnt::relationship rel) { return rel.target().path().resolve(drawing_part.parent()).resolve(xlnt::path{"/"}) == image_path; });
+
+    drawing::drawing drawing;
+
+    if (relation == relationships.end())
+    { // register a new relationship
+        auto rel_id = manifest.register_relationship(
+            uri(drawing_part.string()),
+            relationship_type::image,
+            uri(xlnt::path{".."}.append(image_path.relative_to(drawing_part.resolve(xlnt::path{"/"}))).string()),
+            target_mode::internal);
+
+        drawing.relationship(workbook().manifest().relationship(drawing_part, rel_id));
+    }
+    else
+    {
+        drawing.relationship(*relation);
+    }
+
+    drawing.name(name);
+
+    //  Calculate the arrival cell.
+    auto bottom_right = cell(cells.top_left());
+
+    double width = 0;
+
+    while (width + bottom_right.width() < x_pixels && bottom_right.column_index() < cells.bottom_right().column_index())
+    {
+        width += bottom_right.width();
+        bottom_right = bottom_right.offset(1, 0);
+    }
+
+    double height = 0;
+
+    while (height + bottom_right.height() < y_pixels && bottom_right.row() < cells.bottom_right().row())
+    {
+        height += bottom_right.height();
+        bottom_right = bottom_right.offset(0, 1);
+    }
+
+    const auto leftover_width_emu = pixels_to_emus(std::max(x_pixels - width, 0.));
+    const auto leftover_height_emu = pixels_to_emus(std::max(y_pixels - height , 0.));
+
+    {
+        const auto from = [&]() -> drawing::position {
+            switch (alignment)
+            {
+            case drawing::alignment::left:
+                return {
+                    static_cast<int>(cells.top_left().column_index()) - 1,
+                    0,
+                    static_cast<int>(cells.top_left().row()) - 1,
+                    0};
+
+            case drawing::alignment::right:
+                return {
+                    static_cast<int>(cells.top_left().column_index()) - 1,
+                    leftover_width_emu,
+                    static_cast<int>(cells.top_left().row()) - 1,
+                    leftover_height_emu};
+
+            case drawing::alignment::center:
+            default:
+                return {
+                    static_cast<int>(cells.top_left().column_index()) - 1,
+                    leftover_width_emu / 2,
+                    static_cast<int>(cells.top_left().row()) - 1,
+                    leftover_height_emu / 2};
+            }
+        }();
+
+        drawing.from(from);
+    }
+
+    {
+        const auto to = [&]() -> drawing::position {
+            switch (alignment)
+            {
+            case drawing::alignment::left:
+
+            {
+                return {
+                    static_cast<int>(bottom_right.column_index()) - 1,
+                    leftover_width_emu,
+                    static_cast<int>(bottom_right.row()) - 1,
+                    leftover_height_emu};
+            }
+            case drawing::alignment::right:
+                return {
+                    static_cast<int>(cells.bottom_right().column_index()) - 1,
+                    pixels_to_emus(x_pixels),
+                    static_cast<int>(cells.bottom_right().row()) - 1,
+                    pixels_to_emus(y_pixels)};
+
+            case drawing::alignment::center:
+            default:
+                return {
+                    static_cast<int>(cells.bottom_right().column_index()) - 1,
+                    pixels_to_emus(x_pixels) - leftover_width_emu / 2,
+                    static_cast<int>(cells.bottom_right().row()) - 1,
+                    pixels_to_emus(y_pixels) - leftover_height_emu / 2};
+            }
+        }();
+
+        drawing.to(to);
+    }
+
+    drawing.id(std::to_string(drawings_list.size())); // FIXME if the id is global to the workbook.
+
+    add_drawing(drawing);
 }
 
 void worksheet::title(const std::string &title)
@@ -591,11 +752,12 @@ range_reference worksheet::calculate_dimension(bool skip_null) const
 
     // if skip_null = false, min row = min_row() and min column = min_column()
     // in order to include first empty rows and columns
-    row_t min_row_prop = skip_null? constants::max_row() : constants::min_row();
+    row_t min_row_prop = skip_null ? constants::max_row() : constants::min_row();
     row_t max_row_prop = constants::min_row();
     for (const auto &row_prop : d_->row_properties_)
     {
-        if(skip_null){
+        if (skip_null)
+        {
             min_row_prop = std::min(min_row_prop, row_prop.first);
         }
         max_row_prop = std::max(max_row_prop, row_prop.first);
@@ -606,13 +768,14 @@ range_reference worksheet::calculate_dimension(bool skip_null) const
             constants::min_column(), max_row_prop);
     }
     // find min and max row/column in cell map
-    column_t min_col = skip_null? constants::max_column() : constants::min_column();
+    column_t min_col = skip_null ? constants::max_column() : constants::min_column();
     column_t max_col = constants::min_column();
     row_t min_row = min_row_prop;
     row_t max_row = max_row_prop;
     for (auto &c : d_->cell_map_)
     {
-        if(skip_null){
+        if (skip_null)
+        {
             min_col = std::min(min_col, c.second.column_);
             min_row = std::min(min_row, c.second.row_);
         }
@@ -1212,6 +1375,11 @@ void worksheet::register_comments_in_manifest()
     workbook().register_worksheet_part(*this, relationship_type::comments);
 }
 
+void worksheet::register_drawing_in_manifest()
+{
+    workbook().register_worksheet_part(*this, relationship_type::drawings);
+}
+
 void worksheet::register_calc_chain_in_manifest()
 {
     workbook().register_workbook_part(relationship_type::calculation_chain);
@@ -1274,7 +1442,7 @@ double worksheet::column_width(column_t column) const
 
     if (has_column_properties(column))
     {
-        return column_properties(column).width.get();
+        return excel_width_to_pixels(column_properties(column).width.get());
     }
     else
     {
@@ -1288,7 +1456,7 @@ double worksheet::row_height(row_t row) const
 
     if (has_row_properties(row) && row_properties(row).height.is_set())
     {
-        return row_properties(row).height.get();
+        return points_to_pixels(row_properties(row).height.get(), 96.0);
     }
     else
     {
@@ -1339,7 +1507,22 @@ void worksheet::format_properties(const sheet_format_properties &properties)
 
 bool worksheet::has_drawing() const
 {
-    return d_->drawing_.is_set();
+    return d_->drawings_.size() > 0;
+}
+
+const std::unordered_map<std::string, drawing::drawing> worksheet::drawings() const
+{
+    return d_->drawings_;
+}
+
+void worksheet::add_drawing(const drawing::drawing &drawing)
+{
+    d_->drawings_[drawing.name()] = drawing;
+}
+
+void worksheet::remove_drawing(const std::string &name)
+{
+    d_->drawings_.erase(name);
 }
 
 bool worksheet::is_empty() const

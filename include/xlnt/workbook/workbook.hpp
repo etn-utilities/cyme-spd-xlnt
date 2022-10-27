@@ -801,7 +801,12 @@ public:
     /// <summary>
     /// Returns stored binary data.
     /// </summary>
-    const std::unordered_map<std::string, std::vector<std::uint8_t>>& binaries() const;
+    const std::unordered_map<std::string, std::vector<std::uint8_t>> &binaries() const;
+
+    void add_image(const xlnt::path &image_file, const xlnt::path &archive_file);
+    void add_image(std::vector<std::uint8_t> image_data, const xlnt::path &archive_file);
+
+    bool has_image(const xlnt::path &name) const;
 
     // Calculation properties
 

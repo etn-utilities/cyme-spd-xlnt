@@ -27,19 +27,20 @@
 #include <unordered_map>
 #include <vector>
 
+#include <xlnt/drawing/image.hpp>
 #include <xlnt/drawing/spreadsheet_drawing.hpp>
 #include <xlnt/packaging/ext_list.hpp>
 #include <xlnt/workbook/named_range.hpp>
 #include <xlnt/worksheet/column_properties.hpp>
 #include <xlnt/worksheet/header_footer.hpp>
 #include <xlnt/worksheet/phonetic_pr.hpp>
+#include <xlnt/worksheet/print_options.hpp>
 #include <xlnt/worksheet/range.hpp>
 #include <xlnt/worksheet/range_reference.hpp>
 #include <xlnt/worksheet/row_properties.hpp>
 #include <xlnt/worksheet/sheet_format_properties.hpp>
-#include <xlnt/worksheet/sheet_view.hpp>
-#include <xlnt/worksheet/print_options.hpp>
 #include <xlnt/worksheet/sheet_pr.hpp>
+#include <xlnt/worksheet/sheet_view.hpp>
 #include <detail/implementations/cell_impl.hpp>
 
 namespace xlnt {
@@ -97,7 +98,7 @@ struct worksheet_impl
 
     workbook *parent_;
 
-    bool operator==(const worksheet_impl& rhs) const
+    bool operator==(const worksheet_impl &rhs) const
     {
         return id_ == rhs.id_
             && title_ == rhs.title_
@@ -160,7 +161,7 @@ struct worksheet_impl
     optional<ext_list> extension_list_;
 
     std::string drawing_rel_id_;
-    optional<drawing::spreadsheet_drawing> drawing_;
+    std::unordered_map<std::string, drawing::drawing> drawings_;
 };
 
 } // namespace detail

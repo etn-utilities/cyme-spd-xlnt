@@ -1,4 +1,4 @@
-// Copyright (c) 2018
+// Copyright (c) 2022
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -23,14 +23,12 @@
 
 #pragma once
 
-#include <xlnt/xlnt_config.hpp>
 #include <string>
 #include <vector>
 
-#include <xlnt/drawing/image.hpp>
-
-// v2 includes
-#include <unordered_map>
+#include <xlnt/xlnt_config.hpp>
+#include <xlnt/packaging/relationship.hpp>
+#include <xlnt/utils/optional.hpp>
 
 namespace xml {
 class parser;
@@ -43,35 +41,79 @@ class worksheet;
 
 namespace drawing {
 
-/// <summary>
-/// The spreadsheet_drawing class encapsulates the information
-/// captured from objects within the spreadsheetDrawing schema.
-/// </summary>
-class XLNT_API spreadsheet_drawing
+struct XLNT_API position
 {
-public:
-    spreadsheet_drawing(xml::parser &parser);
-    void serialize(xml::serializer &serializer);
-
-    std::vector<std::string> get_embed_ids();
-
-private:
-    std::string serialized_value_;
-    std::vector<std::string> embed_ids_;
+    int col;
+    int colOff; // In EMUs (1 cm = 360000 EMUs)
+    int row;
+    int rowOff; // In EMUs (1 cm = 360000 EMUs)
 };
 
-namespace v2 {
-/*
-class XLNT_API spreadsheet_drawing
+enum class alignment {
+    left,
+    right,
+    center
+};
+
+/// <summary>
+/// The drawing class encapsulates the information
+/// captured for a single object within the spreadsheetDrawing schema.
+/// </summary>
+class XLNT_API drawing
 {
 public:
-    spreadsheet_drawing(xml::parser &parser);
+    void from(position pos)
+    {
+        from_ = std::move(pos);
+    }
+    position from() const
+    {
+        return from_;
+    }
+
+    void to(position pos)
+    {
+        to_ = std::move(pos);
+    }
+    position to() const
+    {
+        return to_;
+    }
+
+    void name(std::string str)
+    {
+        name_ = std::move(str);
+    }
+    const std::string &name() const
+    {
+        return name_;
+    }
+
+    void id(std::string str)
+    {
+        id_ = std::move(str);
+    }
+    const std::string &id() const
+    {
+        return id_;
+    }
+
+    void relationship(xlnt::relationship rel)
+    {
+        relationship_ = std::move(rel);
+    }
+    const xlnt::relationship &relationship() const
+    {
+        return relationship_;
+    }
 
 private:
-    std::unordered_map<std::string, drawing> drawings_;
-};*/
-
-} // namespace v2
+    position from_;
+    position to_;
+    std::string name_;
+    std::string id_;
+    xlnt::relationship relationship_;
+};
 
 } // namespace drawing
 } // namespace xlnt

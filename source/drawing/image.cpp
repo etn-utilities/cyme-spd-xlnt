@@ -21,57 +21,10 @@
 // @license: http://www.opensource.org/licenses/mit-license.php
 // @author: see AUTHORS file
 
-#pragma once
-
-#include <xlnt/xlnt_config.hpp>
-#include <string>
-#include <vector>
-
 #include <xlnt/drawing/image.hpp>
-
-// v2 includes
-#include <unordered_map>
-
-namespace xml {
-class parser;
-class serializer;
-} // namespace xml
+#include <detail/constants.hpp>
 
 namespace xlnt {
-
-class worksheet;
-
 namespace drawing {
-
-/// <summary>
-/// The spreadsheet_drawing class encapsulates the information
-/// captured from objects within the spreadsheetDrawing schema.
-/// </summary>
-class XLNT_API spreadsheet_drawing
-{
-public:
-    spreadsheet_drawing(xml::parser &parser);
-    void serialize(xml::serializer &serializer);
-
-    std::vector<std::string> get_embed_ids();
-
-private:
-    std::string serialized_value_;
-    std::vector<std::string> embed_ids_;
-};
-
-namespace v2 {
-/*
-class XLNT_API spreadsheet_drawing
-{
-public:
-    spreadsheet_drawing(xml::parser &parser);
-
-private:
-    std::unordered_map<std::string, drawing> drawings_;
-};*/
-
-} // namespace v2
-
 } // namespace drawing
 } // namespace xlnt
