@@ -43,13 +43,14 @@ namespace drawing {
 
 struct XLNT_API position
 {
-    int col;
+    xlnt::column_t::index_t col;
     int colOff; // In EMUs (1 cm = 360000 EMUs)
-    int row;
+    xlnt::row_t row;
     int rowOff; // In EMUs (1 cm = 360000 EMUs)
 };
 
-enum class alignment {
+enum class alignment
+{
     left,
     right,
     center

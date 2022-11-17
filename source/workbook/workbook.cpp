@@ -1478,8 +1478,10 @@ const std::unordered_map<std::string, std::vector<std::uint8_t>> &workbook::bina
     return d_->binaries_;
 }
 
-void workbook::add_image(const xlnt::path &filename, const xlnt::path &archive_file)
+void workbook::add_image(const std::string &filename_str, const std::string &archive_file)
 {
+    xlnt::path filename{filename_str};
+
     if (!(filename.exists() && filename.is_file()))
     {
         throw xlnt::exception("File not found " + filename.string());
@@ -1504,7 +1506,7 @@ void workbook::add_image(const xlnt::path &filename, const xlnt::path &archive_f
     add_image(std::move(data), archive_file);
 }
 
-void workbook::add_image(std::vector<std::uint8_t> image_data, const xlnt::path &archive_file)
+void workbook::add_image(std::vector<std::uint8_t> image_data, const std::string &archive_file)
 {
     const auto target = constants::package_media().append(archive_file).relative_to(path{"/"});
 
