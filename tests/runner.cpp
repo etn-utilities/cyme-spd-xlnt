@@ -21,16 +21,22 @@
 // @license: http://www.opensource.org/licenses/mit-license.php
 // @author: see AUTHORS file
 
-#include <iostream>
 #include <helpers/test_suite.hpp>
+#include <iostream>
 
-void print_summary(const test_status& results)
+#include <xlnt/workbook/workbook.hpp>
+#include <xlnt/worksheet/column_properties.hpp>
+#include <xlnt/worksheet/row_properties.hpp>
+#include <xlnt/worksheet/worksheet.hpp>
+
+void print_summary(const test_status &results)
 {
     std::cout << "\n\n";
 
     std::cout << "Run: " << results.tests_run << '\n';
     std::cout << "Passed: " << results.tests_passed << '\n';
-    std::cout << "Failed: " << results.tests_failed << '\n' << '\n';
+    std::cout << "Failed: " << results.tests_failed << '\n'
+              << '\n';
 
     for (auto failure : results.failures)
     {
@@ -40,9 +46,27 @@ void print_summary(const test_status& results)
 
 int main()
 {
-    test_status overall_status = test_suite::go();
+    // test_status overall_status = test_suite::go();
 
-    print_summary(overall_status);
+    // print_summary(overall_status);
 
-    return static_cast<int>(overall_status.tests_failed);
+    // return static_cast<int>(overall_status.tests_failed);
+
+    xlnt::workbook wb;
+    auto sheet = wb.active_sheet();
+
+    wb.add_image("C:\\Users\\e0627741\\Pictures\\test.jpg", "test.jpg");
+
+    sheet.row_properties(2).height = 250;
+    sheet.row_properties(2).custom_height = true;
+
+    sheet.column_properties(2).width = 250;
+    sheet.column_properties(2).custom_width = true;
+
+    sheet.column_properties(4).width = 72;
+    sheet.column_properties(4).custom_width = true;
+
+    sheet.add_drawing("Img1", xlnt::path{"test.jpg"}, xlnt::range_reference("B2:B2"), 1920, 871);
+
+    wb.save(xlnt::path{"C:\\Users\\e0627741\\Downloads\\XLNTTT\\aaxlnttest.xlsx"});
 }

@@ -299,162 +299,152 @@ void worksheet::add_drawing(const std::string &name, const xlnt::path &image_arc
         drawing.relationship(*relation);
     }
 
+    const auto GetWidth = [this](const range_reference &range) {
+        auto current = cell(range.top_left());
+
+        double width = 0;
+
+        while (current.column_index() <= range.bottom_right().column_index())
+        {
+            width += current.width();
+            current = current.offset(1, 0);
+        }
+
+        return width;
+    };
+
+    const auto GetHeight = [this](const range_reference &range) {
+        auto current = cell(range.top_left());
+
+        double height = 0;
+
+        while (current.row() <= range.bottom_right().row())
+        {
+            height += current.height();
+            current = current.offset(0, 1);
+        }
+
+        return height;
+    };
+
+    const auto GetAspectRatio = [&, this](const range_reference &range) {
+        return GetHeight(range) / GetWidth(range);
+    };
+
     drawing.name(name);
 
+    drawing.x_emu(0);
+    drawing.y_emu(0);
+
     // Position
-    switch (alignment)
+
+    //  Calculate the bottom right cell.
+    auto bottom_right = cell(cells.bottom_right());
+
+    const auto real_aspect_ratio = static_cast<double>(y_pixels) / x_pixels;
+    auto current_aspect_ratio = GetAspectRatio(range_reference{cells.top_left(), bottom_right.reference()});
+
+    // Good luck. This is the ugliest code I've written in my entire life.
+
+    if (current_aspect_ratio > real_aspect_ratio) // This means height/width is too big, so we need to reduce the height.
     {
-    case drawing::alignment::left: {
-        drawing.from({cells.top_left().column_index() - 1, 0, cells.top_left().row() - 1, 0});
+        const auto width_emus = pixels_to_emus(GetWidth(cells));
+        const auto height_emus = real_aspect_ratio * width_emus;
 
-        //  Calculate the bottom right cell.
-        auto bottom_right = cell(cells.top_left());
+        const auto total_height_emus = pixels_to_emus(GetHeight(cells));
 
-        double width = 0;
-
-        while (width + bottom_right.width() < x_pixels && bottom_right.column_index() < cells.bottom_right().column_index())
+        // Find start cell (with offset from alignment)
+        switch (alignment)
         {
-            width += bottom_right.width();
-            bottom_right = bottom_right.offset(1, 0);
+        case drawing::alignment::left: {
+            drawing.from({cells.top_left().column_index(), 0, cells.top_left().row(), 0});
+            break;
+        }
+        case drawing::alignment::center: {
+            const auto total_offset_emus = static_cast<int>((total_height_emus - height_emus) * 0.9 / 2);
+            int offset_emus = 0;
+
+            auto current_cell = cell(cells.top_left());
+
+            while (offset_emus + pixels_to_emus(current_cell.height()) < total_offset_emus)
+            {
+                offset_emus += pixels_to_emus(current_cell.height());
+                current_cell = current_cell.offset(0, 1);
+            }
+
+            drawing.from({current_cell.column_index(), 0, cells.top_left().row(), total_offset_emus - offset_emus});
+            break;
         }
 
-        double height = 0;
+        case drawing::alignment::right: {
+            const auto total_offset_emus = static_cast<int>((total_height_emus - height_emus) * 0.9);
+            int offset_emus = 0;
 
-        while (height + bottom_right.height() < y_pixels && bottom_right.row() < cells.bottom_right().row())
-        {
-            height += bottom_right.height();
-            bottom_right = bottom_right.offset(0, 1);
+            auto current_cell = cell(cells.top_left());
+
+            while (offset_emus + pixels_to_emus(current_cell.height()) < total_offset_emus)
+            {
+                offset_emus += pixels_to_emus(current_cell.height());
+                current_cell = current_cell.offset(0, 1);
+            }
+
+            drawing.from({current_cell.column_index(), 0, cells.top_left().row(), total_offset_emus - offset_emus});
+            break;
+        }
         }
 
-        const auto leftover_width_emu = pixels_to_emus(std::max(x_pixels - width, 0.));
-        const auto leftover_height_emu = pixels_to_emus(std::max(y_pixels - height, 0.));
-
-        drawing.to({bottom_right.column_index() - 1,
-            leftover_width_emu,
-            bottom_right.row() - 1,
-            leftover_height_emu});
-
-        break;
+        drawing.x_emu(width_emus);
+        drawing.y_emu(height_emus);
     }
+    else // The opposite, so we need to reduce the width to an appropriate amount.
+    {
+        const auto height_emus = pixels_to_emus(GetHeight(cells));
+        const auto width_emus = height_emus / real_aspect_ratio;
 
-    case drawing::alignment::right: {
-        double width = 0;
-        double height = 0;
+        const auto total_width_emus = pixels_to_emus(GetWidth(cells));
+
+        // Find start cell (with offset from alignment)
+        switch (alignment)
         {
-            //  Calculate the top left cell.
-            auto top_left = cell(cells.bottom_right());
+        case drawing::alignment::left: {
+            drawing.from({cells.top_left().column_index(), 0, cells.top_left().row(), 0});
+            break;
+        }
+        case drawing::alignment::center: {
+            const auto total_offset_emus = static_cast<int>((total_width_emus - width_emus) * 0.9 / 2);
+            int offset_emus = 0;
 
-            while (width + top_left.width() < x_pixels && top_left.column_index() > cells.top_left().column_index())
+            auto current_cell = cell(cells.top_left());
+
+            while (offset_emus + pixels_to_emus(current_cell.width()) < total_offset_emus)
             {
-                width += top_left.width();
-                top_left = top_left.offset(-1, 0);
+                offset_emus += pixels_to_emus(current_cell.height());
+                current_cell = current_cell.offset(1, 0);
             }
 
-            while (height + top_left.height() < y_pixels && top_left.row() > cells.top_left().row())
-            {
-                height += top_left.height();
-                top_left = top_left.offset(0, -1);
-            }
-
-            const auto leftover_width_emu = pixels_to_emus(top_left.width() - std::max(x_pixels - width, 0.));
-            const auto leftover_height_emu = pixels_to_emus(top_left.height() - std::max(y_pixels - height, 0.));
-
-            drawing.from({top_left.column_index() - 1,
-                leftover_width_emu,
-                top_left.row() - 1,
-                leftover_height_emu});
+            drawing.from({current_cell.column_index(), total_offset_emus - offset_emus, cells.top_left().row(), 0});
+            break;
         }
 
-        {
-            auto bottom_right = cell(cells.bottom_right());
-            drawing.to({cells.bottom_right().column_index() - 1,
-                pixels_to_emus(width),
-                cells.bottom_right().row() - 1,
-                pixels_to_emus(height)});
+        case drawing::alignment::right: {
+            const auto total_offset_emus = static_cast<int>((total_width_emus - width_emus) * 0.9);
+            int offset_emus = 0;
+
+            auto current_cell = cell(cells.top_left());
+
+            while (offset_emus + pixels_to_emus(current_cell.width()) < total_offset_emus)
+            {
+                offset_emus += pixels_to_emus(current_cell.height());
+                current_cell = current_cell.offset(1, 0);
+            }
+
+            drawing.from({current_cell.column_index(), total_offset_emus - offset_emus, cells.top_left().row(), 0});
+            break;
+        }
         }
 
-        break;
-    }
-
-    case drawing::alignment::center: {
-        double total_width = 0;
-        double total_height = 0;
-
-        // First get the total width and height of the cells range
-        {
-            auto it = cell(cells.top_left());
-
-            while (it.column_index() <= cells.top_right().column_index())
-            {
-                total_width += it.width();
-                it = it.offset(1, 0);
-            }
-            while (it.row() <= cells.bottom_left().row())
-            {
-                total_height += it.height();
-                it = it.offset(0, 1);
-            }
-        }
-
-        const auto leftover_width = total_width - x_pixels;
-        const auto leftover_height = total_height - y_pixels;
-
-        // Then we calculate the top left cell and offset
-        {
-            auto it = cell(cells.top_left());
-
-            double width = 0;
-            while (width + it.width() < leftover_width / 2 && it.column_index() < cells.top_right().column_index())
-            {
-                width += it.width();
-                it = it.offset(1, 0);
-            }
-
-            double height = 0;
-            while (height + it.height() < leftover_height / 2 && it.row() < cells.bottom_left().row())
-            {
-                height += it.height();
-                it = it.offset(0, 1);
-            }
-
-            const int x_offset = static_cast<int>(std::max(leftover_width / 2 - width, 0.));
-            const int y_offset = static_cast<int>(std::max(leftover_height / 2 - height, 0.));
-
-            drawing.from({it.column_index() - 1,
-                pixels_to_emus(x_offset),
-                it.row() - 1,
-                pixels_to_emus(y_offset)});
-        }
-
-        // Finally we calculate the bottom right cell and offset
-        {
-            auto it = cell(cells.bottom_right());
-
-            double width = 0;
-            while (width + it.width() < leftover_width / 2 && it.column_index() > cells.top_left().column_index())
-            {
-                width += it.width();
-                it = it.offset(-1, 0);
-            }
-
-            double height = 0;
-            while (height + it.height() < leftover_height / 2 && it.row() > cells.top_right().row())
-            {
-                height += it.height();
-                it = it.offset(0, -1);
-            }
-
-            const int x_offset = static_cast<int>(it.width() - std::max(leftover_width / 2 - width, 0.));
-            const int y_offset = static_cast<int>(it.height() - std::max(leftover_height / 2 - height, 0.));
-
-            drawing.to({it.column_index() - 1,
-                pixels_to_emus(x_offset),
-                it.row() - 1,
-                pixels_to_emus(y_offset)});
-        }
-
-        break;
-    }
+        drawing.x_emu(width_emus);
+        drawing.y_emu(height_emus);
     }
 
     drawing.id(std::to_string(drawings_list.size())); // FIXME if the id is global to the workbook.

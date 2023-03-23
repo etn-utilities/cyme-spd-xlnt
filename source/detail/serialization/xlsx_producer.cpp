@@ -3307,30 +3307,36 @@ void xlsx_producer::write_drawings(const relationship &drawing_rel, worksheet ws
     {
         const auto &drawing = drawing_pair.second;
 
-        write_start_element(xmlns_xdr, "twoCellAnchor");
-        write_attribute("editAs", "oneCell");
+        write_start_element(xmlns_xdr, "oneCellAnchor");
 
         {
             write_start_element(xmlns_xdr, "from");
 
-            write_element(xmlns_xdr, "col", std::to_string(drawing.from().col));
+            write_element(xmlns_xdr, "col", std::to_string(drawing.from().col - 1));
             write_element(xmlns_xdr, "colOff", std::to_string(drawing.from().colOff));
-            write_element(xmlns_xdr, "row", std::to_string(drawing.from().row));
+            write_element(xmlns_xdr, "row", std::to_string(drawing.from().row - 1));
             write_element(xmlns_xdr, "rowOff", std::to_string(drawing.from().rowOff));
 
             write_end_element(xmlns_xdr, "from");
         }
 
         {
+            write_start_element(xmlns_xdr, "ext");
+            write_attribute("cx", std::to_string(drawing.x_emu()));
+            write_attribute("cy", std::to_string(drawing.y_emu()));
+            write_end_element(xmlns_xdr, "ext");
+        }
+
+        /* {
             write_start_element(xmlns_xdr, "to");
 
-            write_element(xmlns_xdr, "col", std::to_string(drawing.to().col));
+            write_element(xmlns_xdr, "col", std::to_string(drawing.to().col - 1));
             write_element(xmlns_xdr, "colOff", std::to_string(drawing.to().colOff));
-            write_element(xmlns_xdr, "row", std::to_string(drawing.to().row));
+            write_element(xmlns_xdr, "row", std::to_string(drawing.to().row - 1));
             write_element(xmlns_xdr, "rowOff", std::to_string(drawing.to().rowOff));
 
             write_end_element(xmlns_xdr, "to");
-        }
+        }*/
 
         {
             write_start_element(xmlns_xdr, "pic");
@@ -3386,13 +3392,13 @@ void xlsx_producer::write_drawings(const relationship &drawing_rel, worksheet ws
                     write_start_element(xmlns_a, "xfrm");
 
                     write_start_element(xmlns_a, "off");
-                    write_attribute("x", "0");
-                    write_attribute("y", "0");
+                    write_attribute("x", std::to_string(drawing.from().colOff)); // Not actually used for positioning
+                    write_attribute("y", std::to_string(drawing.from().rowOff)); // Not actually used for positioning
                     write_end_element(xmlns_a, "off");
 
                     write_start_element(xmlns_a, "ext");
-                    write_attribute("cx", std::to_string(drawing.to().colOff));
-                    write_attribute("cy", std::to_string(drawing.to().rowOff));
+                    write_attribute("cx", std::to_string(drawing.x_emu()));
+                    write_attribute("cy", std::to_string(drawing.y_emu()));
                     write_end_element(xmlns_a, "ext");
 
                     write_end_element(xmlns_a, "xfrm");
@@ -3411,7 +3417,7 @@ void xlsx_producer::write_drawings(const relationship &drawing_rel, worksheet ws
         write_start_element(xmlns_xdr, "clientData");
         write_end_element(xmlns_xdr, "clientData");
 
-        write_end_element(xmlns_xdr, "twoCellAnchor");
+        write_end_element(xmlns_xdr, "oneCellAnchor");
     }
 
     write_end_element(xmlns_xdr, "wsDr");

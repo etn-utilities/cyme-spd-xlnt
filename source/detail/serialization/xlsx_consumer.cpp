@@ -2916,7 +2916,7 @@ void xlsx_consumer::read_drawings(worksheet ws, const path &part)
 
             {
                 expect_start_element(qn("xdr", "col"), xml::content::simple);
-                from.col = read_integer();
+                from.col = read_integer() + 1;
                 expect_end_element(qn("xdr", "col"));
             }
 
@@ -2928,7 +2928,7 @@ void xlsx_consumer::read_drawings(worksheet ws, const path &part)
 
             {
                 expect_start_element(qn("xdr", "row"), xml::content::simple);
-                from.row = read_integer();
+                from.row = read_integer() + 1;
                 expect_end_element(qn("xdr", "row"));
             }
 
@@ -2950,7 +2950,7 @@ void xlsx_consumer::read_drawings(worksheet ws, const path &part)
 
             {
                 expect_start_element(qn("xdr", "col"), xml::content::simple);
-                to.col = read_integer();
+                to.col = read_integer() + 1;
                 expect_end_element(qn("xdr", "col"));
             }
 
@@ -2962,7 +2962,7 @@ void xlsx_consumer::read_drawings(worksheet ws, const path &part)
 
             {
                 expect_start_element(qn("xdr", "row"), xml::content::simple);
-                to.row = read_integer();
+                to.row = read_integer() + 1;
                 expect_end_element(qn("xdr", "row"));
             }
             {
@@ -3042,19 +3042,18 @@ void xlsx_consumer::read_drawings(worksheet ws, const path &part)
                 {
                     expect_start_element(qn("a", "xfrm"), xml::content::complex);
 
-                    /* 
                     expect_start_element(qn("a", "off"), xml::content::empty);
 
-                    // ?? x and y
                     skip_attributes();
                     expect_end_element(qn("a", "off"));
 
                     expect_start_element(qn("a", "ext"), xml::content::empty);
 
-                    // ?? cx and cy
+                    drawing.x_emu(parser().attribute<int>("cx"));
+                    drawing.y_emu(parser().attribute<int>("cy"));
+
                     skip_attributes();
                     expect_end_element(qn("a", "ext"));
-                    */
 
                     skip_remaining_content(qn("a", "xfrm"));
                     expect_end_element(qn("a", "xfrm"));

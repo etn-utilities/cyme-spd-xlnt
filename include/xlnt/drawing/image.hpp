@@ -81,6 +81,26 @@ public:
         return to_;
     }
 
+    int x_emu() const
+    {
+        return x_emu_;
+    }
+
+    void x_emu(int x)
+    {
+        x_emu_ = x;
+    }
+
+    int y_emu() const
+    {
+        return y_emu_;
+    }
+
+    void y_emu(int y)
+    {
+        y_emu_ = y;
+    }
+
     void name(std::string str)
     {
         name_ = std::move(str);
@@ -111,6 +131,8 @@ public:
 private:
     position from_;
     position to_;
+    int x_emu_;
+    int y_emu_;
     std::string name_;
     std::string id_;
     xlnt::relationship relationship_;
