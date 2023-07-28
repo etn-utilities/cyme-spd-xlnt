@@ -361,7 +361,7 @@ void worksheet::add_drawing(const std::string &name, const xlnt::path &image_arc
             break;
         }
         case drawing::alignment::center: {
-            const auto total_offset_emus = static_cast<int>((total_height_emus - height_emus) * 0.9 / 2);
+            const auto total_offset_emus = static_cast<int>((total_height_emus - height_emus) / 2);
             int offset_emus = 0;
 
             auto current_cell = cell(cells.top_left());
@@ -377,7 +377,7 @@ void worksheet::add_drawing(const std::string &name, const xlnt::path &image_arc
         }
 
         case drawing::alignment::right: {
-            const auto total_offset_emus = static_cast<int>((total_height_emus - height_emus) * 0.9);
+            const auto total_offset_emus = static_cast<int>(total_height_emus - height_emus);
             int offset_emus = 0;
 
             auto current_cell = cell(cells.top_left());
@@ -411,7 +411,7 @@ void worksheet::add_drawing(const std::string &name, const xlnt::path &image_arc
             break;
         }
         case drawing::alignment::center: {
-            const auto total_offset_emus = static_cast<int>((total_width_emus - width_emus) * 0.9 / 2);
+            const auto total_offset_emus = static_cast<int>((total_width_emus - width_emus) / 2);
             int offset_emus = 0;
 
             auto current_cell = cell(cells.top_left());
@@ -427,7 +427,7 @@ void worksheet::add_drawing(const std::string &name, const xlnt::path &image_arc
         }
 
         case drawing::alignment::right: {
-            const auto total_offset_emus = static_cast<int>((total_width_emus - width_emus) * 0.9);
+            const auto total_offset_emus = static_cast<int>(total_width_emus - width_emus);
             int offset_emus = 0;
 
             auto current_cell = cell(cells.top_left());
