@@ -808,6 +808,9 @@ public:
 
     bool has_image(const xlnt::path &name) const;
 
+    void set_system_dpi(double dpi);
+    double get_system_dpi() const;
+
     // Calculation properties
 
     /// <summary>

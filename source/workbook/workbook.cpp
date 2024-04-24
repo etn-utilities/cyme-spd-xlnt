@@ -1519,6 +1519,16 @@ bool workbook::has_image(const xlnt::path &name) const
     return d_->images_.find(key) != d_->images_.end();
 }
 
+void workbook::set_system_dpi(double dpi)
+{
+    d_->system_dpi_ = dpi;
+}
+
+double workbook::get_system_dpi() const
+{
+    return d_->system_dpi_;
+}
+
 style workbook::create_style(const std::string &name)
 {
     return d_->stylesheet_.get().create_style(name);

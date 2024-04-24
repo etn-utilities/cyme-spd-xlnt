@@ -132,6 +132,7 @@ struct workbook_impl
     optional<theme> theme_;
     std::unordered_map<std::string, std::vector<std::uint8_t>> images_;
     std::unordered_map<std::string, std::vector<std::uint8_t>> binaries_;
+    double system_dpi_ = 96.0;
 
     std::vector<std::pair<xlnt::core_property, variant>> core_properties_;
     std::vector<std::pair<xlnt::extended_property, variant>> extended_properties_;

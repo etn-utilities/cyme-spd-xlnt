@@ -62,9 +62,10 @@ int points_to_pixels(double points, double dpi)
 }
 
 template <typename T>
-constexpr int pixels_to_emus(T pixels)
+constexpr int pixels_to_emus(T pixels, double dpi)
 {
-    return static_cast<int>(9525 * pixels);
+    static int multiplier = 914400.0 / dpi;
+    return static_cast<int>(multiplier * pixels);
 }
 
 constexpr int excel_width_to_pixels(double width)
@@ -344,20 +345,28 @@ void worksheet::add_drawing(const std::string &name, const xlnt::path &image_arc
     const auto real_aspect_ratio = static_cast<double>(y_pixels) / x_pixels;
     auto current_aspect_ratio = GetAspectRatio(range_reference{cells.top_left(), bottom_right.reference()});
 
+    double system_dpi = workbook().get_system_dpi();
+
+    // Images are drawn right on the cell lines. Allow a ~1 pixel adjustment to avoid this overlap.
+    const int adjustment = 10000; 
+
+    // Keep a 5% spacer below images
+    const double safeguard = 0.95;
+
     // Good luck. This is the ugliest code I've written in my entire life.
 
     if (current_aspect_ratio > real_aspect_ratio) // This means height/width is too big, so we need to reduce the height.
     {
-        const auto width_emus = pixels_to_emus(GetWidth(cells));
+        const auto width_emus = pixels_to_emus(GetWidth(cells), system_dpi) * safeguard;
         const auto height_emus = real_aspect_ratio * width_emus;
 
-        const auto total_height_emus = pixels_to_emus(GetHeight(cells));
+        const auto total_height_emus = pixels_to_emus(GetHeight(cells), system_dpi);
 
         // Find start cell (with offset from alignment)
         switch (alignment)
         {
         case drawing::alignment::left: {
-            drawing.from({cells.top_left().column_index(), 0, cells.top_left().row(), 0});
+            drawing.from({cells.top_left().column_index(), adjustment, cells.top_left().row(), adjustment});
             break;
         }
         case drawing::alignment::center: {
@@ -366,13 +375,13 @@ void worksheet::add_drawing(const std::string &name, const xlnt::path &image_arc
 
             auto current_cell = cell(cells.top_left());
 
-            while (offset_emus + pixels_to_emus(current_cell.height()) < total_offset_emus)
+            while (offset_emus + pixels_to_emus(current_cell.height(), system_dpi) < total_offset_emus)
             {
-                offset_emus += pixels_to_emus(current_cell.height());
+                offset_emus += pixels_to_emus(current_cell.height(), system_dpi);
                 current_cell = current_cell.offset(0, 1);
             }
 
-            drawing.from({current_cell.column_index(), 0, cells.top_left().row(), total_offset_emus - offset_emus});
+            drawing.from({current_cell.column_index(), adjustment, cells.top_left().row(), total_offset_emus - offset_emus});
             break;
         }
 
@@ -382,32 +391,32 @@ void worksheet::add_drawing(const std::string &name, const xlnt::path &image_arc
 
             auto current_cell = cell(cells.top_left());
 
-            while (offset_emus + pixels_to_emus(current_cell.height()) < total_offset_emus)
+            while (offset_emus + pixels_to_emus(current_cell.height(), system_dpi) < total_offset_emus)
             {
-                offset_emus += pixels_to_emus(current_cell.height());
+                offset_emus += pixels_to_emus(current_cell.height(), system_dpi);
                 current_cell = current_cell.offset(0, 1);
             }
 
-            drawing.from({current_cell.column_index(), 0, cells.top_left().row(), total_offset_emus - offset_emus});
+            drawing.from({current_cell.column_index(), adjustment, cells.top_left().row(), total_offset_emus - offset_emus});
             break;
         }
         }
 
-        drawing.x_emu(width_emus);
-        drawing.y_emu(height_emus);
+        drawing.x_emu(width_emus - adjustment);
+        drawing.y_emu(height_emus - adjustment);
     }
     else // The opposite, so we need to reduce the width to an appropriate amount.
     {
-        const auto height_emus = pixels_to_emus(GetHeight(cells));
+        const auto height_emus = pixels_to_emus(GetHeight(cells), system_dpi) * safeguard;
         const auto width_emus = height_emus / real_aspect_ratio;
 
-        const auto total_width_emus = pixels_to_emus(GetWidth(cells));
+        const auto total_width_emus = pixels_to_emus(GetWidth(cells), system_dpi);
 
         // Find start cell (with offset from alignment)
         switch (alignment)
         {
         case drawing::alignment::left: {
-            drawing.from({cells.top_left().column_index(), 0, cells.top_left().row(), 0});
+            drawing.from({cells.top_left().column_index(), adjustment, cells.top_left().row(), adjustment});
             break;
         }
         case drawing::alignment::center: {
@@ -416,13 +425,13 @@ void worksheet::add_drawing(const std::string &name, const xlnt::path &image_arc
 
             auto current_cell = cell(cells.top_left());
 
-            while (offset_emus + pixels_to_emus(current_cell.width()) < total_offset_emus)
+            while (offset_emus + pixels_to_emus(current_cell.width(), system_dpi) < total_offset_emus)
             {
-                offset_emus += pixels_to_emus(current_cell.height());
+                offset_emus += pixels_to_emus(current_cell.width(), system_dpi);
                 current_cell = current_cell.offset(1, 0);
             }
 
-            drawing.from({current_cell.column_index(), total_offset_emus - offset_emus, cells.top_left().row(), 0});
+            drawing.from({current_cell.column_index(), total_offset_emus - offset_emus, cells.top_left().row(), adjustment});
             break;
         }
 
@@ -432,19 +441,19 @@ void worksheet::add_drawing(const std::string &name, const xlnt::path &image_arc
 
             auto current_cell = cell(cells.top_left());
 
-            while (offset_emus + pixels_to_emus(current_cell.width()) < total_offset_emus)
+            while (offset_emus + pixels_to_emus(current_cell.width(), system_dpi) < total_offset_emus)
             {
-                offset_emus += pixels_to_emus(current_cell.height());
+                offset_emus += pixels_to_emus(current_cell.width(), system_dpi);
                 current_cell = current_cell.offset(1, 0);
             }
 
-            drawing.from({current_cell.column_index(), total_offset_emus - offset_emus, cells.top_left().row(), 0});
+            drawing.from({current_cell.column_index(), total_offset_emus - offset_emus, cells.top_left().row(), adjustment});
             break;
         }
         }
 
-        drawing.x_emu(width_emus);
-        drawing.y_emu(height_emus);
+        drawing.x_emu(width_emus - adjustment);
+        drawing.y_emu(height_emus - adjustment);
     }
 
     drawing.id(std::to_string(drawings_list.size())); // FIXME if the id is global to the workbook.
